@@ -59,46 +59,102 @@
 // 	return EXIT_SUCCESS;
 // }
 
-int main(int argc, char *argv[]) {
+// int main(int argc, char *argv[]) {
 
-    if (argc < 2) {
-        fprintf(stderr, "No pipe functions passed\n");
-        return EXIT_FAILURE;
-    }
+//     if (argc < 2) {
+//         fprintf(stderr, "No pipe functions passed\n");
+//         return EXIT_FAILURE;
+//     }
+
+//     int NUM_PROCESSES = argc - 1;
+//     int fd[2 * NUM_PROCESSES];
+
+//     // Create pipes
+//     for (int i = 0; i < NUM_PROCESSES; i++) {
+//         if (pipe(fd + 2 * i) == -1) {
+//             perror("error with pipe");
+//             exit(EXIT_FAILURE);
+//         }
+//     }
+
+//     pid_t p = 0;
+
+
+//     while (argc > 1 && p == 0) {
+//         p = fork();
+//         if (p < 0) {
+//             perror("error iwth fork");
+//             exit(EXIT_FAILURE);
+//         }
+//         argc--;
+//     }
+
+//     if (argc == 1) {
+//         dup2(fd[1], STDOUT_FILENO);
+//     } else if (argc == NUM_PROCESSES) {
+//         dup2(fd[2 * (argc - 2)], STDIN_FILENO);
+//     } else {
+//         dup2(fd[2 * (argc - 2)], STDIN_FILENO);
+//         dup2(fd[2 * (argc - 1) + 1], STDOUT_FILENO);
+//     }
+
+//     char *prog_name = argv[argc];
+//     printf("Here\n%s", prog_name);
+//     execlp(prog_name, prog_name, NULL);
+//     perror("execlp");
+//     exit(EXIT_FAILURE);
+// }
+
+int main (int argc, char *argv[]) {
+    
+    enum PIPES {
+        READ, WRITE
+    };
 
     int NUM_PROCESSES = argc - 1;
-    int fd[2 * NUM_PROCESSES];
+    int fd[2*(NUM_PROCESSES-1)];
 
-    // Create pipes
     for (int i = 0; i < NUM_PROCESSES; i++) {
-        if (pipe(fd + 2 * i) == -1) {
+        if (pipe(fd + 2*i) == -1) {
             perror("error with pipe");
             exit(EXIT_FAILURE);
         }
     }
 
-    pid_t p = 0;
+    pid_t pid = fork();
+    if (pid == 0) {
+        dup2(fd[WRITE], 1);
+        char *prog_name = argv[1];
+        execlp(prog_name, prog_name, NULL);
+        exit(0);
+    } 
+    else {
+        close(fd[WRITE]);
+    }
 
-    while (argc > 1 && p == 0) {
-        p = fork();
-        if (p < 0) {
-            perror("error iwth fork");
-            exit(EXIT_FAILURE);
+
+    for (int i = 1; i < NUM_PROCESSES-1; i++) {
+        pid = fork();
+        if (pid == 0) {
+        dup2(fd[2*(i-1) + READ], 0);
+        dup2(fd[2*i + WRITE], 1);
+        char *prog_name = argv[i+1];
+        execlp(prog_name, prog_name, NULL);
+        exit(0);    
         }
-        argc--;
+        else {
+            close(fd[2*i + WRITE]);
+        }
     }
 
-    if (argc == 1) {
-        dup2(fd[1], STDOUT_FILENO);
-    } else if (argc == NUM_PROCESSES) {
-        dup2(fd[2 * (argc - 2)], STDIN_FILENO);
-    } else {
-        dup2(fd[2 * (argc - 2)], STDIN_FILENO);
-        dup2(fd[2 * (argc - 1) + 1], STDOUT_FILENO);
+    pid = fork();
+    if (pid == 0) {
+        dup2(fd[2*(NUM_PROCESSES-2) + READ], 0);
+        char *prog_name = argv[NUM_PROCESSES];
+        execlp(prog_name, prog_name, NULL);
     }
 
-    char *prog_name = argv[argc];
-    execlp(prog_name, prog_name, NULL);
-    perror("execlp");
-    exit(EXIT_FAILURE);
+    int status, options = 0;
+    waitpid(pid, &status, options);
+    return EXIT_SUCCESS;
 }
