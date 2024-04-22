@@ -130,6 +130,7 @@ int main (int argc, char *argv[]) {
     } 
     else {
         close(fd[WRITE]);
+        wait(pid);
     }
 
 
@@ -144,6 +145,7 @@ int main (int argc, char *argv[]) {
         }
         else {
             close(fd[2*i + WRITE]);
+            wait(pid);
         }
     }
 
