@@ -128,6 +128,7 @@ int main (int argc, char *argv[]) {
         dup2(stderr_id, 2);
         char *prog_name = argv[1];
         execlp(prog_name, prog_name, NULL);
+        printf("error");
         exit(errno);
     } 
     else {
@@ -136,7 +137,7 @@ int main (int argc, char *argv[]) {
         waitpid(pid, &status, 0);
         if ( WIFEXITED(status) ) {
             errno = WEXITSTATUS(status);
-            if (errno != 1) {
+            if (errno != 0) {
                 exit(errno);
             }
         }
@@ -145,11 +146,12 @@ int main (int argc, char *argv[]) {
     for (int i = 1; i < NUM_PROCESSES-1; i++) {
         pid = fork();
         if (pid == 0) {
-        dup2(fd[2*(i-1) + READ], 0);
-        dup2(fd[2*i + WRITE], 1);
-        char *prog_name = argv[i+1];
-        execlp(prog_name, prog_name, NULL);
-        exit(errno);    
+            dup2(fd[2*(i-1) + READ], 0);
+            dup2(fd[2*i + WRITE], 1);
+            char *prog_name = argv[i+1];
+            execlp(prog_name, prog_name, NULL);
+            printf("error");
+            exit(errno);    
         }
         else {
             close(fd[2*i + WRITE]);
@@ -157,28 +159,31 @@ int main (int argc, char *argv[]) {
             waitpid(pid, &status, 0);
             if ( WIFEXITED(status) ) {
                 errno = WEXITSTATUS(status);
-                if (errno != 1) {
+                if (errno != 0) {
                     exit(errno);
                 }
             }
         }
     }
 
-    pid = fork();
-    if (pid == 0) {
-        dup2(fd[2*(NUM_PROCESSES-2) + READ], 0);
-        char *prog_name = argv[NUM_PROCESSES];
-        execlp(prog_name, prog_name, NULL);
-        exit(errno);
-    }
-
-    int status;
-    waitpid(pid, &status, 0);
-    if ( WIFEXITED(status) ) {
-        errno = WEXITSTATUS(status);
-        if (errno != 1) {
+    if (NUM_PROCESSES > 1) {
+        pid = fork();
+        if (pid == 0) {
+            dup2(fd[2*(NUM_PROCESSES-2) + READ], 0);
+            char *prog_name = argv[NUM_PROCESSES];
+            execlp(prog_name, prog_name, NULL);
             exit(errno);
         }
+
+        int status;
+        waitpid(pid, &status, 0);
+        if ( WIFEXITED(status) ) {
+            errno = WEXITSTATUS(status);
+            if (errno != 0) {
+                exit(errno);
+            }
+        }
+        exit(0);
     }
-    exit(0);
+    
 }
