@@ -1,3 +1,4 @@
+
 type ('nonterminal, 'terminal) symbol =
   | N of 'nonterminal
   | T of 'terminal
@@ -14,7 +15,7 @@ on the test grammars given in Homework 1. For example, the top-level definition
 let awksub_grammar_2 = convert_grammar awksub_grammar should bind awksub_grammar_2 
 to a Homework 2-style grammar that is equivalent to the Homework 1-style grammar 
 awksub_grammar. *)
-  
+
 let rec matcher rules mnt =
   match rules with
     | (nt, rhs)::tl -> if nt = mnt
@@ -70,43 +71,57 @@ prefix. When this happens, the matcher returns whatever the
 acceptor returned. If no acceptable match is found, the matcher
 returns None. *)
 
+let print_terminals frag =
+  (* print_endline name; *)
+  List.iter (fun x ->print_string (x ^ " ")) frag;
+  print_newline ()
+
 (* ex: [N Expr, T"09", N Term] *)
 let rec match_append gram_check rule frag =
+  (* print_terminals frag "AND"; *)
   match rule with
   | (T rh)::rtl -> 
-    (match frag with
-    | fh::ftl -> if fh=rh then
-       match_append gram_check rtl ftl else None
-    | [] -> None)
+    (
+      match frag with
+      | fh::ftl -> if fh=rh then
+        match_append gram_check rtl ftl else None
+      | [] -> None
+    )
   | (N rh)::rtl -> let res_frag = 
     match_or gram_check (gram_check rh) frag in 
-    ( match res_frag with
-    | None -> None
-    | Some x -> match_append gram_check rtl x)
+    (
+      match res_frag with
+      | None -> None
+      | Some x -> match_append gram_check rtl x
+    )
   | [] -> Some (frag)
 
-
 and match_or gram_check rules frag =
+  (* print_terminals frag "OR"; *)
   match rules with
   | rh::rtl -> let mh = 
-      match_append gram_check rh frag in
-      ( match mh with
+    match_append gram_check rh frag in
+    (
+      match mh with
       | None -> match_or gram_check rtl frag
-      | Some x -> mh
-      )
+      | Some x -> Some x
+    )
   | [] -> None
 
 let rec root_make_or gram_check rules acc frag =
     match match_or gram_check rules frag with
     | None -> acc frag
-    | Some x ->
+    | Some x -> print_terminals x;
       let result = acc x in
-      (match result with
-      | Some res -> Some res
-      | None -> 
-        (match rules with
-        | hd::tl -> root_make_or gram_check tl acc frag
-        | [] -> None)
+      (
+        match result with
+        | Some res -> Some res
+        | None -> 
+          (
+            match rules with
+            | hd::tl -> root_make_or gram_check tl acc frag
+            | [] -> None
+          )
       )
 
 let make_matcher (root, gram_check) acc frag =
@@ -147,7 +162,7 @@ let awkish_grammar =
 
 let match_appender_tested (root, grammar_check) rule frag = 
   match_or grammar_check (grammar_check rule) frag
-
+(* 
 let test0 =
   ((make_matcher awkish_grammar accept_all ["9"]))
 
@@ -155,12 +170,64 @@ let test2 =
   ((make_matcher awkish_grammar accept_all ["9"; "+"; "$"; "1"; "+"]))
 
 let test3 =
-  ((make_matcher awkish_grammar accept_empty_suffix ["9"; "+"; "$"; "1"; "+"]))
+  ((make_matcher awkish_grammar accept_empty_suffix ["9"; "+"; "$"; "1"; "+"])) *)
+  let test4 =
+    (make_matcher awkish_grammar accept_all
+        ["$"; "9"; "+"; "9"; "-"; "9"; "7"; "7"])
 
-let test4 =
-  ((make_matcher awkish_grammar accept_all
-      ["("; "$"; "8"; ")"; "-"; "$"; "++"; "$"; "--"; "$"; "9"; "+";
-        "("; "$"; "++"; "$"; "2"; "+"; "("; "8"; ")"; "-"; "9"; ")";
-        "-"; "("; "$"; "$"; "$"; "$"; "$"; "++"; "$"; "$"; "5"; "++";
-        "++"; "--"; ")"; "-"; "++"; "$"; "$"; "("; "$"; "8"; "++"; ")";
-        "++"; "+"; "0"]))    
+  (* let test4 =
+    (make_matcher awkish_grammar accept_empty_suffix
+        ["("; "$"; "8"; ")"; "-"; "$"; "++"; "$"; "--"; "$"; "9"; "+";
+         "("; "$"; "++"; "$"; "2"; "+"; "("; "8"; ")"; "-"; "9"; ")";
+         "-"; "("; "$"; "$"; "$"; "$"; "$"; "++"; "$"; "$"; "5"; "++";
+         "++"; "--"; ")"; "-"; "++"; "$"; "$"; "("; "$"; "8"; "++"; ")";
+         "++"; "+"; "0"]) *)
+
+(* Write a function make_parser gram that returns a parser for the grammar gram. 
+When applied to a fragment frag, the parser returns an optional parse tree. 
+If frag cannot be parsed entirely (that is, from beginning to end), the parser 
+returns None. Otherwise, it returns Some tree where tree is the parse tree corresponding
+to the input fragment. Your parser should try grammar rules in the same order 
+as make_matcher. *)
+
+(* 
+let rec match_append gram_check rule frag =
+  match rule with
+  | (T rh)::rtl -> 
+    (match frag with
+    | fh::ftl -> if fh=rh then
+       match_append gram_check rtl ftl else None
+    | [] -> None)
+  | (N rh)::rtl -> let res_frag = 
+    match_or gram_check (gram_check rh) frag in 
+    ( match res_frag with
+    | None -> None
+    | Some x -> match_append gram_check rtl x)
+  | [] -> Some (frag)
+
+
+and match_or gram_check rules frag =
+  match rules with
+  | rh::rtl -> let mh = 
+      match_append gram_check rh frag in
+      ( match mh with
+      | None -> match_or gram_check rtl frag
+      | Some x -> mh
+      )
+  | [] -> None
+
+let rec root_make_or gram_check rules acc frag =
+    match match_or gram_check rules frag with
+    | None -> acc frag
+    | Some x ->
+      let result = acc x in
+      (match result with
+      | Some res -> Some res
+      | None -> 
+        (match rules with
+        | hd::tl -> root_make_or gram_check tl acc frag
+        | [] -> None)
+      )
+
+let make_matcher (root, gram_check) acc frag =
+  root_make_or gram_check (gram_check root) acc frag *)
