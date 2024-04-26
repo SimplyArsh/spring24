@@ -85,7 +85,6 @@ let rec match_append gram_check rule frag =
     | Some x -> match_append gram_check rtl x)
   | [] -> Some (frag)
 
-
 and match_or gram_check rules frag =
   match rules with
   | rh::rtl -> let mh = 
@@ -114,53 +113,51 @@ let make_matcher (root, gram_check) acc frag =
 
 let accept_all string = Some string
 
-let accept_empty_suffix = function
+let accept_empty_suffix suffix = match suffix with
   | _::_ -> None
   | x -> Some x
 
 type awksub_nonterminals =
   | Expr | Term | Lvalue | Incrop | Binop | Num
 
-let awkish_grammar =
-  (Expr,
-   function
-     | Expr ->
-         [[N Term; N Binop; N Expr];
-          [N Term]]
-     | Term ->
-      [[N Num];
-        [N Lvalue];
-        [N Incrop; N Lvalue];
-        [N Lvalue; N Incrop];
-        [T"("; N Expr; T")"]]
-     | Lvalue ->
-	      [[T"$"; N Expr]]
-     | Incrop ->
-        [[T"++"];
-        [T"--"]]
-     | Binop ->
-        [[T"+"];
-        [T"-"]]
-     | Num ->
-        [[T"0"]; [T"1"]; [T"2"]; [T"3"]; [T"4"];
-          [T"5"]; [T"6"]; [T"7"]; [T"8"]; [T"9"]])
+  let awkish_grammar =
+    (Expr,
+     function
+       | Expr ->
+           [[N Term; N Binop; N Expr];
+            [N Term]]
+       | Term ->
+     [[N Num];
+      [N Lvalue];
+      [N Incrop; N Lvalue];
+      [N Lvalue; N Incrop];
+      [T"("; N Expr; T")"]]
+       | Lvalue ->
+     [[T"$"; N Expr]]
+       | Incrop ->
+     [[T"++"];
+      [T"--"]]
+       | Binop ->
+     [[T"+"];
+      [T"-"]]
+       | Num ->
+     [[T"0"]; [T"1"]; [T"2"]; [T"3"]; [T"4"];
+      [T"5"]; [T"6"]; [T"7"]; [T"8"]; [T"9"]])
 
 let match_appender_tested (root, grammar_check) rule frag = 
   match_or grammar_check (grammar_check rule) frag
 
 let test0 =
-  ((make_matcher awkish_grammar accept_all ["9"]))
+  ((make_matcher awkish_grammar accept_all ["1"]))
+
+let test1 =
+  ((make_matcher awkish_grammar accept_empty_suffix ["$"; "3"; "--"]))
 
 let test2 =
-  ((make_matcher awkish_grammar accept_all ["9"; "+"; "$"; "1"; "+"]))
+  ((make_matcher awkish_grammar accept_empty_suffix ["2"; "+"; "3"]))
 
 let test3 =
-  ((make_matcher awkish_grammar accept_empty_suffix ["9"; "+"; "$"; "1"; "+"]))
+  ((make_matcher awkish_grammar accept_empty_suffix ["("; "2"; "+"; "3"; ")"]))
 
 let test4 =
-  ((make_matcher awkish_grammar accept_all
-      ["("; "$"; "8"; ")"; "-"; "$"; "++"; "$"; "--"; "$"; "9"; "+";
-        "("; "$"; "++"; "$"; "2"; "+"; "("; "8"; ")"; "-"; "9"; ")";
-        "-"; "("; "$"; "$"; "$"; "$"; "$"; "++"; "$"; "$"; "5"; "++";
-        "++"; "--"; ")"; "-"; "++"; "$"; "$"; "("; "$"; "8"; "++"; ")";
-        "++"; "+"; "0"]))    
+  ((make_matcher awkish_grammar accept_empty_suffix ["1"; "+"; "$"; "2"; "--"]))
