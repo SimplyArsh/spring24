@@ -1,0 +1,15 @@
+I had to rewrite the parser several differnent times, until I finally realized
+that it could be done by reworking the code from make_matcher. The two are similar
+in structure, however, because the parser mom and mam need to pass in a tree like structure
+that also ought to be returned alongside the acceptor, it complicates the code a bit.
+The mom is identical with the small differnence of passing in the tree. This is because
+mom does not change the tree at all. It only passes it through the layers of recursion.
+Mam on the other hand needs to modify the tree. Once we have reached the end of the rule
+and it has matched with the fragment, we return a Node that contains the parent symbol and
+the child list we created. If mam matches a terminal, then it appends a Leaf to the child. Finally,
+if it matches a non-terminal, we invoke mam on the remaining tail of the rule with a to-be-created
+node appended to the child list we have built, and pass this acceptor into mom with an empty child
+list and a copy of the parent symbol. Because, we have to pass the tree at the end, the parser 
+required me to explicitly specify the "arguments" at the top, and had a differnent structure. I
+could not figure out how to combine the matcher and the parcer and have them work with just differnent
+wrapper code, therefore, my code is a bit redundant. But, there are very similar in implementation.
