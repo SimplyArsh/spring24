@@ -21,12 +21,13 @@ struct process
   TAILQ_ENTRY(process) pointers;
 
   /* Additional fields here */
-  u32 started;
-  u32 time_passed;
+  u32 time_left;
+  u32 untouched;
   /* End of "Additional fields here" */
 };
 
 TAILQ_HEAD(process_list, process);
+TAILQ_HEAD(q_list, process);
 
 u32 next_int(const char **data, const char *data_end)
 {
@@ -144,85 +145,63 @@ void init_processes(const char *path,
   close(fd);
 }
 
-void round_robin (struct process_list* head,
-                  u32 quantum_length,
-                  u32 size,
-                  u32* total_waiting_time,
-                  u32* total_response_time)
-{
-  struct process *temp, *head_ptr;
-  head_ptr = TAILQ_FIRST(head);
-  u32 current_time, prev_time;
-  u32 time_forward_flag = 0;
-  u32 finished_count = 0;
-  u32 executed_count = 0;
+void round_robin (
+  struct process *data,
+  struct process_list* q_head,
+  u32 quantum_length,
+  u32 size,
+  u32* total_waiting_time,
+  u32* total_response_time
+) {
 
-  if (head_ptr != NULL) {
-    current_time = head_ptr->arrival_time;
-    prev_time = current_time;
-  }
-  
-  printf("T  B  S?  R  W\n");
-  while (finished_count != size) {
+  // book-keeping variables
+  struct process *curr, *temp;
+  u32 curr_time, ps_done = 0;
+  u32 p_idx = 0, p_fin = 0; 
 
-    printf("CYCLE\n");
-    finished_count = 0;
-    executed_count = 0;
-    if (current_time == prev_time) {
-      time_forward_flag = 1;
-    }
-    prev_time = current_time;
-    
-    // iterate through all the processes
-    TAILQ_FOREACH(temp, head, pointers) {
+  while (ps_done < size) {
 
-      printf("%d, %d, %d, %d, %d.\n", current_time, 
-        temp->burst_time, temp->started, *total_response_time, *total_waiting_time);
-      // check if the process is already finished
-      if (temp->burst_time == 0) {
-        // printf("Process %d has finished.\n", temp->pid);
-        finished_count++;
-        continue;
-      }
-
-      // process hasn't started
-      if (temp->started == 0) {
-
-        // forward time if stuck
-        if (time_forward_flag) {
-          current_time = temp->arrival_time;
-          time_forward_flag = 0;
+    // forward time if Q is empty
+    if (TAILQ_EMPTY(q_head)) {
+        if (p_idx < size) {
+          curr_time = data[p_idx].arrival_time;
         }
-
-        if (executed_count != 0 && temp->arrival_time >= current_time) {
-          break;
-        }
-
-        // the process has arrived
-        if (temp->arrival_time <= current_time) {
-          *total_response_time += current_time - temp->arrival_time;
-          printf("Response_time_added %d.\n", current_time - temp->arrival_time);
-          temp->started = 1;
-        }
-
-      } else {
-        executed_count += 1;
-        // waiting time
-        if (temp->burst_time <= quantum_length) {
-          *total_waiting_time = current_time + temp->burst_time - temp->arrival_time;
-          current_time += temp->burst_time;
-          temp->burst_time = 0;
-        } else {
-          temp->burst_time -= quantum_length;
-          current_time += quantum_length;
-        }
-        
-      }
-
     }
 
-  }
+    // get a process? from Q
+    curr = TAILQ_FIRST(q_head);
 
+    // if there is process and its not been executed yet, calculate response time
+    if (curr != NULL && curr->untouched) {
+      curr->untouched = 0;
+      *total_response_time += curr_time - curr->arrival_time;
+    }
+
+    // if there is a process, execute it. If it finihes, calculate waiting time.
+    if (curr != NULL && curr->time_left <= quantum_length) {
+      ps_done++; p_fin = 1;
+      curr_time += curr->time_left;
+      *total_waiting_time += curr_time - curr->arrival_time - curr->burst_time;
+      TAILQ_REMOVE(q_head, curr, pointers);
+    } else if (curr != NULL) {
+      p_fin = 0;
+      curr_time += quantum_length;
+      curr->time_left -= quantum_length;
+      TAILQ_REMOVE(q_head, curr, pointers);
+    }
+
+    // if new processes come in during this time, add them to EOQ
+    while (p_idx < size && data[p_idx].arrival_time <= curr_time) {
+      data[p_idx].untouched = 1;
+      data[p_idx].time_left = data[p_idx].burst_time;
+      TAILQ_INSERT_TAIL(q_head, &data[p_idx], pointers);
+      p_idx++;
+    }
+
+    // if we executed a process and it didn't finish, add it back to the EOQ
+    if (curr != NULL && !p_fin) TAILQ_INSERT_TAIL(q_head, curr, pointers);
+
+  }
 
 }
 
@@ -245,12 +224,11 @@ int main(int argc, char *argv[])
   u32 total_response_time = 0;
 
   /* Your code here */
-  for (u32 i = 0; i < size; i++) {
-    TAILQ_INSERT_TAIL(&list, &data[i], pointers);
-    data[i].started = 0;
-  }
 
-  round_robin(&list, quantum_length, size, &total_waiting_time, &total_response_time);
+  if (quantum_length != 0) {
+      round_robin(data, &list, quantum_length, size, 
+    &total_waiting_time, &total_response_time);
+  }
 
   /* End of "Your code here" */
 
@@ -260,3 +238,4 @@ int main(int argc, char *argv[])
   free(data);
   return 0;
 }
+
